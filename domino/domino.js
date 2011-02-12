@@ -47,17 +47,22 @@ domino.board = function(cols, rows) {
       }
     }    
   }
+  
+  this.swapBlock = function(block, col, row) {
+    this.blocks[col][row] = block;
+  }
 };
 
 domino.blockDisplay = function(block, w, h) {
   this.width = w = w || domino.blockWidth;
   this.height = h = h || domino.blockHeight;
-  this.sprite = new lime.Label().setSize(w,h);
+  this.sprite = new lime.Label().setSize(w,h)
+    .setPosition(w * block.col, h * block.row);
   
   this.swapBlock = function(block) {
     this.block = block;
     
-    this.sprite.setPosition(w * block.col, h * block.row)
+    this.sprite
       .setFill(block.color)
       .setText(block.symbol);
   };
@@ -86,11 +91,11 @@ domino.boardDisplay = function(layer, board) {
         fun(display[c][r]);
       }
     }    
-  }  ;
+  } 
   
   this.swapBlock = function(block, col, row) {
     display[col][row].swapBlock(block);
-    this.board.swapBlock(block, col, row)
+    this.board.swapBlock(block, col, row);
   }
 };
 
@@ -132,21 +137,13 @@ domino.start = function(){
 
 	director.makeMobileWebAppCapable();
 
-	
-	
-    goog.events.listen(nextBlockLayer, ['mousedown', 'touchstart'], function(e) {
-      
-      var drag = e.startDrag(); //snap to center
-      
-      // add drop targets, allows snapping in place
-      boardDisplay.each(function(blockDisplay) {
-        drag.addDropTarget(blockDisplay.sprite);
-      });
-      
-      e.swallow(['mouseup', 'touchend'], function(e) {
-        console.log('release: ' + e);
-      });
+    boardDisplay.each(function(blockDisplay) {
+      goog.events.listen(blockDisplay.sprite, 'click', function(e) {
+        var blk = blockDisplay.block;
+        boardDisplay.swapBlock(nextBlock.block, blk.col, blk.row);
+      })
     });
+	
     
 
 	// set current scene active
