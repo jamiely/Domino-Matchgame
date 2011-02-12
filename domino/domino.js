@@ -15,6 +15,48 @@ goog.require('lime.animation.MoveTo');
 
 domino.blockWidth = 30;
 domino.blockHeight = 30;
+domino.symbols = {
+  wild: '*',
+  empty: '?'
+};
+
+domino.wild = {
+  symbol: domino.symbols.wild,
+  color: '#666'
+}
+
+domino.keys = function(h) {
+  var k = [];
+  for(var i in h) {
+    k.push(i);
+  }
+  return k;
+}
+
+domino.each = function(a, fun) {
+  for(var c = 0; c < a.length; c ++) {
+    fun(a[c]);
+  }  
+}
+
+domino.has = function(a, el) {
+  for(var c = 0; c < a.length; c ++) {
+    if(el == a[c]) {
+      return true;
+    }
+  };
+  return false;
+}
+
+domino.filter = function(a, fun) {
+  var rtn = [];
+  for(var c = 0; c < a.length; c ++) {
+    if(fun(a[c])) {
+      rtn.push(a[c]);
+    }
+  };
+  return rtn;
+}
 
 domino.block = function(col, row, symbol, color) {
   this.symbol = symbol || '';
@@ -32,12 +74,41 @@ domino.board = function(cols, rows) {
   for(var c = 0; c < cols; c ++) {
     for (var r = 0; r < rows; r ++) {
       if(!this.blocks[c]) this.blocks[c] = [];
-      this.blocks[c][r] = new domino.block(c,r,'?', '#EEE');
+      this.blocks[c][r] = new domino.block(c,r, domino.symbols.empty, '#EEE');
     }
   }
   
   this.block = function(c, r) {
     return this.blocks[c][r];
+  }
+  
+  this.neighbors = function(blk) {
+    var n = [];
+    n.push(this.get(blk.col - 1, blk.row));  
+    n.push(this.get(blk.col + 1, blk.row));  
+    n.push(this.get(blk.col, blk.row - 1));  
+    n.push(this.get(blk.col, blk.row + 1));  
+    return n;
+  }
+  
+  this.neighborInfo = function(blk) {
+    var colors = {}, symbols = {},
+      neighbors = domino.filter(this.neighbors(blk), function(n) {
+        return n.symbol != domino.symbols.empty;
+      });
+    domino.each(neighbors, function(n) {
+      colors[n.color] = 1;
+      symbols[n.symbol] = 1;
+    });
+    return {
+      colors: domino.keys(colors),
+      symbols: domino.keys(symbols)
+    };
+  }
+  
+  this.get = function(c, r) {
+    return this.blocks[c] && this.blocks[c][r] ?
+      this.blocks[c][r] : null;
   }
   
   this.each = function(fun) {
@@ -49,7 +120,34 @@ domino.board = function(cols, rows) {
   }
   
   this.swapBlock = function(block, col, row) {
+    // set these in case they haven't been set
+    block.row = row;
+    block.col = col;
     this.blocks[col][row] = block;
+  }
+  
+  this.isValid = function(target, replacement) {
+    var taken = target.symbol != domino.symbols.empty,
+      neighbors = this.neighbors(target),
+      empty = domino.filter(neighbors, function(blk) {
+        return blk == null || blk.symbol == domino.symbols.empty;
+      }),
+      mismatches = domino.filter(neighbors, function(blk) {
+        var empty = blk == null || blk.symbol == domino.symbols.empty;
+        if(empty) return false;
+        
+        var colMatch = blk.color == replacement.color || 
+          blk.color == domino.wild.color;
+        
+        var symMatch = blk.symbol == replacement.symbol ||
+          blk.symbol == domino.wild.symbol;
+          
+        return !(colMatch || symMatch);
+      }),
+      valid = !taken && mismatches.length == 0 &&
+        empty.length < 4;
+
+    return valid;
   }
 };
 
@@ -117,6 +215,7 @@ domino.blockFactory = function() {
 };
 
 
+
 // entrypoint
 domino.start = function(){
 	var director = new lime.Director(document.body,1024,768),
@@ -125,23 +224,35 @@ domino.start = function(){
 	    blockLayer = new lime.Layer().setPosition(100,0),
 	    nextBlockLayer = new lime.Layer().setPosition(0,0),
 	    blockFactory = new domino.blockFactory(),
-	    nextBlock = null,
-	    boardDisplay = new domino.boardDisplay(blockLayer, gameBoard);
+	    _nextBlock = null,
+	    boardDisplay = new domino.boardDisplay(blockLayer, gameBoard),
+	    initBlock = new domino.block(1, 1, domino.wild.symbol, domino.wild.color);
 
   scene.appendChild(blockLayer);
   scene.appendChild(nextBlockLayer)
   
+  function nextBlock() {
+    _nextBlock.swapBlock(blockFactory.generate());
+  }
   //create next block
-  nextBlock = new domino.blockDisplay(blockFactory.generate());
-  nextBlockLayer.appendChild(nextBlock.sprite);
+  _nextBlock = new domino.blockDisplay(blockFactory.generate());
+  nextBlockLayer.appendChild(_nextBlock.sprite);
+  
+  boardDisplay.swapBlock(initBlock, 5, 5);
 
 	director.makeMobileWebAppCapable();
 
     boardDisplay.each(function(blockDisplay) {
       goog.events.listen(blockDisplay.sprite, 'click', function(e) {
+        // the clicked block
         var blk = blockDisplay.block;
-        boardDisplay.swapBlock(nextBlock.block, blk.col, blk.row);
-      })
+        
+        if(gameBoard.isValid(blk, _nextBlock.block)) {
+          boardDisplay.swapBlock(_nextBlock.block, blk.col, blk.row);
+        
+          nextBlock();
+        }
+      });
     });
 	
     
