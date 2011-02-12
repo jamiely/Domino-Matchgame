@@ -13,8 +13,8 @@ goog.require('lime.animation.FadeTo');
 goog.require('lime.animation.ScaleTo');
 goog.require('lime.animation.MoveTo');
 
-domino.blockWidth = 50;
-domino.blockHeight = 50;
+domino.blockWidth = 30;
+domino.blockHeight = 30;
 
 domino.block = function(col, row, symbol, color) {
   this.symbol = symbol || '';
@@ -32,7 +32,7 @@ domino.board = function(cols, rows) {
   for(var c = 0; c < cols; c ++) {
     for (var r = 0; r < rows; r ++) {
       if(!this.blocks[c]) this.blocks[c] = [];
-      this.blocks[c][r] = new domino.block(c,r,'e', '#F00');
+      this.blocks[c][r] = new domino.block(c,r,'?', '#EEE');
     }
   }
   
@@ -52,12 +52,16 @@ domino.board = function(cols, rows) {
 domino.blockDisplay = function(block, w, h) {
   this.width = w = w || domino.blockWidth;
   this.height = h = h || domino.blockHeight;
-  this.block = block;
-  this.sprite = 
-    new lime.Label().setSize(w,h)
-      .setPosition(w * block.col, h * block.row)
+  this.sprite = new lime.Label().setSize(w,h);
+  
+  this.swapBlock = function(block) {
+    this.block = block;
+    
+    this.sprite.setPosition(w * block.col, h * block.row)
       .setFill(block.color)
       .setText(block.symbol);
+  };
+  this.swapBlock(block, w, h);
 }
 
 domino.boardDisplay = function(layer, board) {
@@ -73,8 +77,21 @@ domino.boardDisplay = function(layer, board) {
         
     // add each sprite to the layer
     layer.appendChild(spriteBlock.sprite);
+    
   });
   
+  this.each = function(fun) {
+    for(var c = 0; c < board.cols; c ++) {
+      for (var r = 0; r < board.rows; r ++) {
+        fun(display[c][r]);
+      }
+    }    
+  }  ;
+  
+  this.swapBlock = function(block, col, row) {
+    display[col][row].swapBlock(block);
+    this.board.swapBlock(block, col, row)
+  }
 };
 
 domino.blockFactory = function() {
@@ -115,33 +132,22 @@ domino.start = function(){
 
 	director.makeMobileWebAppCapable();
 
-    //add some interaction
-    goog.events.listen(blockLayer,['mousedown','touchstart'],function(e){
+	
+	
+    goog.events.listen(nextBlockLayer, ['mousedown', 'touchstart'], function(e) {
       
-        //animate
-        blockLayer.runAction(new lime.animation.Spawn(
-            new lime.animation.FadeTo(.5).setDuration(.2),
-            new lime.animation.ScaleTo(1.5).setDuration(.8)
-        ));
-    
-        title.runAction(new lime.animation.FadeTo(1));
-    
-        //let layer follow the mouse/finger
-        e.startDrag();
-    
-        //listen for end event
-        e.swallow(['mouseup','touchend'],function(){
-            blockLayer.runAction(new lime.animation.Spawn(
-                new lime.animation.FadeTo(1),
-                new lime.animation.ScaleTo(1),
-                new lime.animation.MoveTo(512,384)
-            ));
-    
-            title.runAction(new lime.animation.FadeTo(0));
-        });
-    
-    
+      var drag = e.startDrag(); //snap to center
+      
+      // add drop targets, allows snapping in place
+      boardDisplay.each(function(blockDisplay) {
+        drag.addDropTarget(blockDisplay.sprite);
+      });
+      
+      e.swallow(['mouseup', 'touchend'], function(e) {
+        console.log('release: ' + e);
+      });
     });
+    
 
 	// set current scene active
 	director.replaceScene(scene);
