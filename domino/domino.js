@@ -23,8 +23,8 @@ domino.colors = {
 
 domino.symbols = {
   wild: '*',
-  empty: '?',
-  cleared: '_'
+  empty: '_',
+  cleared: '-'
 };
 
 domino.wild = {
@@ -138,13 +138,15 @@ domino.board = function(symbol, color, cols, rows) {
   }
   
   this.isValid = function(target, replacement) {
-    var taken = target.symbol != domino.symbols.empty,
+    var taken = (target.symbol != domino.symbols.empty &&
+        target.symbol != domino.symbols.cleared),
       neighbors = this.neighbors(target),
       empty = domino.filter(neighbors, function(blk) {
         return blk == null || blk.symbol == domino.symbols.empty;
       }),
       mismatches = domino.filter(neighbors, function(blk) {
-        var empty = blk == null || blk.symbol == domino.symbols.empty;
+        var empty = blk == null || blk.symbol == domino.symbols.empty ||
+          blk.symbol == domino.symbols.cleared;
         if(empty) return false;
         
         var colMatch = blk.color == replacement.color || 
@@ -163,17 +165,6 @@ domino.board = function(symbol, color, cols, rows) {
   
   
   
-  this.clearRow = function(rowIndex) {
-    for(var c = 0; c < cols; c++) {
-      this.blocks[c][rowIndex] = this.getClearBlock(c, rowIndex);
-    }
-  };
-  
-  this.clearColumn = function(colIndex) {
-    for(var r = 0; r < rows; r++) {
-      this.blocks[colIndex][r] = this.getClearBlock(colIndex, rowIndex);
-    }    
-  };
 };
 
 domino.board.getClearBlock = function(c,r) {
@@ -234,8 +225,8 @@ domino.boardDisplay = function(layer, board) {
   };
   
   this.swapBlock = function(block, col, row) {
-    col = col || block.col;
-    row = row || block.row;
+    col = typeof col == 'undefined' ? block.col : col;
+    row = typeof row == 'undefined' ? block.row : row;
     
     display[col][row].swapBlock(block);
     this.board.swapBlock(block, col, row);
@@ -250,25 +241,14 @@ domino.boardDisplay = function(layer, board) {
       r = c.row;
       c = c.col;
     }
-    display[col][row].cleared = true;
+    display[c][r].cleared = true;
     this.swapBlock(domino.board.getClearBlock(c, r));
   }
   
-  this.clearRow = function(rowIndex) {
-    for(var c = 0; c < board.cols; c ++) {
-      this.clearBlock(c, rowIndex);
-    }
-  }
-  
-  this.clearColumn = function(colIndex) {
-    for(var r = 0; r < rows; r++) {
-      this.clearBlock(colIndex, r);
-    }
-  }
   
   this.getColumn = function(colIndex) {
     var blocks = [];
-    for(var r = 0; r < rows; r++) {
+    for(var r = 0; r < board.rows; r++) {
       blocks.push(display[colIndex][r]);
     }
     return blocks;
@@ -282,16 +262,18 @@ domino.boardDisplay = function(layer, board) {
     return blocks;
   }  
   
-  var filled = function(blk) {
-    return blk.symbol == domino.symbols.empty ||
-      blk.symbol == domino.symbols.cleared;
+  var filled = function(blockDisplay) {
+    return blockDisplay.block.symbol != domino.symbols.empty;
   };
   
   /**
    * Check row and col of last altered block, to see if we should clear.
    */
   this.update = function() {
-    var blk = lastSwapped.block,
+    var blk = lastSwapped.block;
+    if(!blk) return;
+    
+    var
       col = this.getColumn(blk.col),
       row = this.getRow(blk.row),
       colFilled = domino.filter(col, filled),
@@ -335,7 +317,7 @@ domino.start = function(){
 	    
 	    // shows current game pieces
       gameBoard = new domino.board(),
-	    blockLayer = new lime.Layer().setPosition(100,0),
+	    blockLayer = new lime.Layer().setPosition(100,50),
 	    
 	    
 	    
@@ -367,8 +349,8 @@ domino.start = function(){
         
         if(gameBoard.isValid(blk, _nextBlock.block)) {
           boardDisplay.swapBlock(_nextBlock.block, blk.col, blk.row);
-          boardDisplay.update();
           nextBlock();
+          boardDisplay.update();
         }
       });
     });
