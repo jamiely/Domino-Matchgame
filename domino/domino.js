@@ -15,9 +15,16 @@ goog.require('lime.animation.MoveTo');
 
 domino.blockWidth = 30;
 domino.blockHeight = 30;
+
+domino.colors = {
+  empty: '#EEE',
+  cleared: '#d1c072'
+};
+
 domino.symbols = {
   wild: '*',
-  empty: '?'
+  empty: '?',
+  cleared: '_'
 };
 
 domino.wild = {
@@ -65,7 +72,10 @@ domino.block = function(col, row, symbol, color) {
   this.row = row;
 }
 
-domino.board = function(cols, rows) {
+domino.board = function(symbol, color, cols, rows) {
+  symbol = symbol || domino.symbols.empty;
+  color = color || domino.colors.empty;
+  
   // defaults
   this.rows = rows = rows || 10;
   this.cols = cols = cols || 10;
@@ -74,7 +84,8 @@ domino.board = function(cols, rows) {
   for(var c = 0; c < cols; c ++) {
     for (var r = 0; r < rows; r ++) {
       if(!this.blocks[c]) this.blocks[c] = [];
-      this.blocks[c][r] = new domino.block(c,r, domino.symbols.empty, '#EEE');
+      this.blocks[c][r] = new domino.block(c,r, 
+        domino.symbols.empty, domino.colors.empty);
     }
   }
   
@@ -149,13 +160,33 @@ domino.board = function(cols, rows) {
 
     return valid;
   }
+  
+  
+  
+  this.clearRow = function(rowIndex) {
+    for(var c = 0; c < cols; c++) {
+      this.blocks[c][rowIndex] = this.getClearBlock(c, rowIndex);
+    }
+  };
+  
+  this.clearColumn = function(colIndex) {
+    for(var r = 0; r < rows; r++) {
+      this.blocks[colIndex][r] = this.getClearBlock(colIndex, rowIndex);
+    }    
+  };
 };
+
+domino.board.getClearBlock = function(c,r) {
+  return new domino.block(c,r,
+      domino.symbols.cleared, domino.colors.cleared);
+}
 
 domino.blockDisplay = function(block, w, h) {
   this.width = w = w || domino.blockWidth;
   this.height = h = h || domino.blockHeight;
   this.sprite = new lime.Label().setSize(w,h)
     .setPosition(w * block.col, h * block.row);
+  this.cleared = false;
   
   this.swapBlock = function(block) {
     this.block = block;
@@ -169,10 +200,15 @@ domino.blockDisplay = function(block, w, h) {
 
 domino.boardDisplay = function(layer, board) {
   this.board = board;
-  var display = [];
+  var display = [],
+    that = this;
   
   this.board.each(function(block) {
-    if(!display[block.col]) display[block.col] = [];
+    if(!display[block.col]) {
+      display[block.col] = [];
+    }
+    
+
     
     var spriteBlock = 
       display[block.col][block.row] = 
@@ -191,10 +227,86 @@ domino.boardDisplay = function(layer, board) {
     }    
   } 
   
+  var lastSwapped = {
+    block: null,
+    col: 0,
+    row: 0
+  };
+  
   this.swapBlock = function(block, col, row) {
+    col = col || block.col;
+    row = row || block.row;
+    
     display[col][row].swapBlock(block);
     this.board.swapBlock(block, col, row);
+    
+    lastSwapped.block = block;
+    lastSwapped.col = col;
+    lastSwapped.row = row;
   }
+  
+  this.clearBlock = function(c,r) {
+    if(typeof c == 'object') {
+      r = c.row;
+      c = c.col;
+    }
+    display[col][row].cleared = true;
+    this.swapBlock(domino.board.getClearBlock(c, r));
+  }
+  
+  this.clearRow = function(rowIndex) {
+    for(var c = 0; c < board.cols; c ++) {
+      this.clearBlock(c, rowIndex);
+    }
+  }
+  
+  this.clearColumn = function(colIndex) {
+    for(var r = 0; r < rows; r++) {
+      this.clearBlock(colIndex, r);
+    }
+  }
+  
+  this.getColumn = function(colIndex) {
+    var blocks = [];
+    for(var r = 0; r < rows; r++) {
+      blocks.push(display[colIndex][r]);
+    }
+    return blocks;
+  }
+  
+  this.getRow = function(rowIndex) {
+    var blocks = [];
+    for(var c = 0; c < board.cols; c ++) {
+      blocks.push(display[c][rowIndex]);
+    }
+    return blocks;
+  }  
+  
+  var filled = function(blk) {
+    return blk.symbol == domino.symbols.empty ||
+      blk.symbol == domino.symbols.cleared;
+  };
+  
+  /**
+   * Check row and col of last altered block, to see if we should clear.
+   */
+  this.update = function() {
+    var blk = lastSwapped.block,
+      col = this.getColumn(blk.col),
+      row = this.getRow(blk.row),
+      colFilled = domino.filter(col, filled),
+      rowFilled = domino.filter(row, filled),
+      clearCol = colFilled.length == col.length,
+      clearRow = rowFilled.length == row.length,
+      clear = function(blockDisplay) {
+        that.clearBlock(blockDisplay.block)
+      };
+    
+    if(clearCol) domino.each(col, clear);
+    if(clearRow) domino.each(row, clear);
+  }
+  
+  
 };
 
 domino.blockFactory = function() {
@@ -220,8 +332,13 @@ domino.blockFactory = function() {
 domino.start = function(){
 	var director = new lime.Director(document.body,1024,768),
 	    scene = new lime.Scene(),
+	    
+	    // shows current game pieces
       gameBoard = new domino.board(),
 	    blockLayer = new lime.Layer().setPosition(100,0),
+	    
+	    
+	    
 	    nextBlockLayer = new lime.Layer().setPosition(0,0),
 	    blockFactory = new domino.blockFactory(),
 	    _nextBlock = null,
@@ -229,7 +346,8 @@ domino.start = function(){
 	    initBlock = new domino.block(1, 1, domino.wild.symbol, domino.wild.color);
 
   scene.appendChild(blockLayer);
-  scene.appendChild(nextBlockLayer)
+  scene.appendChild(nextBlockLayer);
+
   
   function nextBlock() {
     _nextBlock.swapBlock(blockFactory.generate());
@@ -249,7 +367,7 @@ domino.start = function(){
         
         if(gameBoard.isValid(blk, _nextBlock.block)) {
           boardDisplay.swapBlock(_nextBlock.block, blk.col, blk.row);
-        
+          boardDisplay.update();
           nextBlock();
         }
       });
