@@ -310,7 +310,21 @@ domino.blockFactory = function() {
   };
 };
 
-
+domino.discard = function(funDiscard) {
+  var
+    that = this,
+    layer = this.layer = new lime.Layer().setPosition(0, 100);
+  
+  var text = new lime.Label()
+    .setSize(100, 25).setPosition(50, 0)
+    .setText('Discard').setFill('#CCF');
+    
+  layer.appendChild(text);
+  this.ondiscard = function(e) { console.log(e); }
+  goog.events.listen(text, 'click', function(e){
+    that.ondiscard(e);
+  });
+};
 
 // entrypoint
 domino.start = function(){
@@ -319,7 +333,7 @@ domino.start = function(){
 	    
 	    // shows current game pieces
       gameBoard = new domino.board(),
-	    blockLayer = new lime.Layer().setPosition(100,50),
+	    blockLayer = new lime.Layer().setPosition(200,50),
 	    
 	    
 	    
@@ -327,10 +341,14 @@ domino.start = function(){
 	    blockFactory = new domino.blockFactory(),
 	    _nextBlock = null,
 	    boardDisplay = new domino.boardDisplay(blockLayer, gameBoard),
-	    initBlock = new domino.block(1, 1, domino.wild.symbol, domino.wild.color);
+	    initBlock = new domino.block(1, 1, domino.wild.symbol, domino.wild.color),
+	    
+	    // discard
+	    discard = new domino.discard();
 
   scene.appendChild(blockLayer);
   scene.appendChild(nextBlockLayer);
+  scene.appendChild(discard.layer);
 
   
   function nextBlock() {
@@ -356,7 +374,10 @@ domino.start = function(){
         }
       });
     });
-	
+	  
+	  discard.ondiscard = function(e) {
+	    nextBlock();
+	  };
     
 
 	// set current scene active
