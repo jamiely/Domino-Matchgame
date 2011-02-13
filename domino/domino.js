@@ -142,7 +142,8 @@ domino.board = function(symbol, color, cols, rows) {
         target.symbol != domino.symbols.cleared),
       neighbors = this.neighbors(target),
       empty = domino.filter(neighbors, function(blk) {
-        return blk == null || blk.symbol == domino.symbols.empty;
+        return blk == null || blk.symbol == domino.symbols.empty ||
+          blk.symbol == domino.symbols.cleared;
       }),
       mismatches = domino.filter(neighbors, function(blk) {
         var empty = blk == null || blk.symbol == domino.symbols.empty ||
@@ -263,7 +264,8 @@ domino.boardDisplay = function(layer, board) {
   }  
   
   var filled = function(blockDisplay) {
-    return blockDisplay.block.symbol != domino.symbols.empty;
+    return blockDisplay.block.symbol != domino.symbols.empty &&
+      blockDisplay.block.symbol != domino.symbols.cleared;
   };
   
   /**
