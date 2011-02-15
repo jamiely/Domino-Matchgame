@@ -36,9 +36,15 @@ domino.keys = function(h) {
 }
 
 domino.each = function(a, fun) {
+  domino.map(a, fun);
+}
+
+domino.map = function(a, fun) {
+  var res = [];
   for(var c = 0; c < a.length; c ++) {
-    fun(a[c]);
-  }  
+    res.push(fun(a[c]));
+  }
+  return res;
 }
 
 domino.has = function(a, el) {
@@ -65,6 +71,19 @@ domino.block = function(col, row, symbol, color) {
   this.color = color || '';
   this.col = col;
   this.row = row;
+  
+  this.fillable = function() {
+    return empty() || clear();
+  }
+  
+  var empty = this.empty = function() {
+    return symbol == domino.symbols.empty;
+  }
+  
+  var clear = this.clear = function() {
+    return symbol == domino.symbols.cleared; 
+  }
+
 }
 
 domino.board = function(symbol, color, cols, rows) {
@@ -72,20 +91,93 @@ domino.board = function(symbol, color, cols, rows) {
   color = color || domino.colors.empty;
   
   // defaults
-  this.rows = rows = rows || 10;
-  this.cols = cols = cols || 10;
+  this.rows = rows = rows || 5;
+  this.cols = cols = cols || 5;
   
-  this.blocks = [];
+  var _blocks = [],
+    _cleared = [];
+    
+  this.blockCount = rows * cols;
+  
+  // board init
   for(var c = 0; c < cols; c ++) {
     for (var r = 0; r < rows; r ++) {
-      if(!this.blocks[c]) this.blocks[c] = [];
-      this.blocks[c][r] = new domino.block(c,r, 
+      if(!_blocks[c]) {
+        _blocks[c] = [];
+        _cleared[c] = [];
+      }
+      _blocks[c][r] = new domino.block(c,r, 
         domino.symbols.empty, domino.colors.empty);
+      _cleared[c][r] = false;
     }
   }
   
+  this.clearedCountCached = 0;
+  /**
+   * Determine if the entire board has been cleared.
+   */
+  this.clearedCount = function() {
+    var that = this, count = 0;
+    
+    this.eachIndex(function(c,r) {
+      if(_cleared[c][r]) count++;
+    });
+    
+    this.clearedCountCached = count;
+    return count;
+  }
+  
+  this.cleared = function() {
+    return this.clearedCount() == this.blockCount;
+  }
+  
+  /**
+   * Mark the position as cleared.
+   */
+  this.clear = function(c,r) {
+    _cleared[c][r] = true;
+  }
+  
+  /**
+   * Use to determine if there are any possible valid moves yet
+   */
+  this.hasMoves = function() {
+    return true;
+  }
+  
+  /**
+   * Use to get the possible locations where the block may be
+   * placed legally.
+   */
+  this.moves = function(blk) {
+    var that = this,
+      fillable = this.fillable(),
+      moves = domino.filter(fillable, function(target) {
+        return that.isValid(target, blk);
+      });
+    
+    return moves;
+  }
+  
+  /**
+   * Use to get the locations of fillable areas, that is, places
+   * where we can put down a piece.
+   */
+  this.fillable = function() {
+    var blocks = [];
+    this.each(function(blk) {
+      if(blk.fillable())
+        blocks.push(blk);
+    });
+    
+    return blocks;
+  }
+  
+  /**
+   * retrieve a particular block
+   */
   this.block = function(c, r) {
-    return this.blocks[c][r];
+    return _blocks[c][r];
   }
   
   this.neighbors = function(blk) {
@@ -113,23 +205,39 @@ domino.board = function(symbol, color, cols, rows) {
   }
   
   this.get = function(c, r) {
-    return this.blocks[c] && this.blocks[c][r] ?
-      this.blocks[c][r] : null;
+    return _blocks[c] && _blocks[c][r] ?
+      _blocks[c][r] : null;
   }
   
-  this.each = function(fun) {
+  this.eachIndex = function(fun) {
+    this.mapIndex(fun);
+  }
+
+  this.mapIndex = function(fun) {
+    var res = [];
     for(var c = 0; c < cols; c ++) {
       for (var r = 0; r < rows; r ++) {
-        fun(this.blocks[c][r]);
+        res.push(fun(c, r));
       }
     }    
+    return res;
+  }
+
+  this.each = function(fun) {
+    this.map(fun);
+  }
+  this.map = function(fun) {
+    var res = this.mapIndex(function(c,r) {
+      return fun(_blocks[c][r]);
+    });
+    return res;
   }
   
   this.swapBlock = function(block, col, row) {
     // set these in case they haven't been set
     block.row = row;
     block.col = col;
-    this.blocks[col][row] = block;
+    _blocks[col][row] = block;
   }
   
   this.isValid = function(target, replacement) {
@@ -238,6 +346,7 @@ domino.boardDisplay = function(layer, board) {
       c = c.col;
     }
     display[c][r].cleared = true;
+    this.board.clear(c,r);
     this.swapBlock(domino.board.getClearBlock(c, r));
   }
   
@@ -321,13 +430,31 @@ domino.discard = function(funDiscard) {
   });
 };
 
+domino.widgetClear = function() {
+  var layer = this.layer = new lime.Layer().setPosition(0, 150),
+    text = new lime.Label().setSize(100, 25).setPosition(50, 0)
+      .setText('0 cleared').setFill('#EEE');
+  
+  layer.appendChild(text);
+  
+  this.text = function(count) {
+    if(count) {
+      text.setText(count + ' cleared');
+      return this;
+    }
+    else {
+      return text.getText();
+    }
+  }
+};
+
 // entrypoint
 domino.start = function(){
 	var director = new lime.Director(document.body,1024,768),
 	    scene = new lime.Scene(),
 	    
 	    // shows current game pieces
-      gameBoard = new domino.board(),
+      gameBoard = new domino.board(null, null, 11, 11),
 	    blockLayer = new lime.Layer().setPosition(200,50),
 	    
 	    
@@ -338,12 +465,16 @@ domino.start = function(){
 	    boardDisplay = new domino.boardDisplay(blockLayer, gameBoard),
 	    initBlock = new domino.block(1, 1, domino.wild.symbol, domino.wild.color),
 	    
+	    // widget clear
+	    clearWidget = new domino.widgetClear(),
+	    
 	    // discard
 	    discard = new domino.discard();
 
   scene.appendChild(blockLayer);
   scene.appendChild(nextBlockLayer);
   scene.appendChild(discard.layer);
+  scene.appendChild(clearWidget.layer);
 
   
   function nextBlock() {
@@ -353,7 +484,8 @@ domino.start = function(){
   _nextBlock = new domino.blockDisplay(blockFactory.generate());
   nextBlockLayer.appendChild(_nextBlock.sprite);
   
-  boardDisplay.swapBlock(initBlock, 5, 5);
+  var mid = Math.floor(gameBoard.rows/2);
+  boardDisplay.swapBlock(initBlock, mid, mid);
 
 	director.makeMobileWebAppCapable();
 
@@ -366,6 +498,11 @@ domino.start = function(){
           boardDisplay.swapBlock(_nextBlock.block, blk.col, blk.row);
           nextBlock();
           boardDisplay.update();
+          if(boardDisplay.board.cleared()) {
+            alert('You won!');
+          }
+          var count = boardDisplay.board.clearedCountCached;
+          clearWidget.text(count);
         }
       });
     });
