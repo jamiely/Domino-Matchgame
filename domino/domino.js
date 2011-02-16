@@ -400,7 +400,8 @@ domino.boardDisplay = function(layer, board) {
 };
 
 domino.blockFactory = function() {
-  var possibleColors = [
+  var that = this,
+    possibleColors = [
     '#F00', '#0f0', '#FF0', '#00f', '#0ff',
     '#8414AC', '#2FDEFB', '#F11B71', '#54FF45', '#2008FF'
     ],
@@ -426,14 +427,16 @@ domino.blockFactory = function() {
     return new domino.block(1, 1, sym, color);
   };
   
-  this.inc = function() {
-    this.colors.push(possibleColors.shift());
-    this.symbols.push(possibleSymbols.shift());
+  var inc = this.inc = function(counter) {
+    that.colors.push(possibleColors.shift());
+    that.symbols.push(possibleSymbols.shift());
+    if(counter && counter > 0) {
+      that.inc(counter-1);
+    }
   }
   
   // add 4 symbols
-  this.inc();
-  this.inc();
+  this.inc(1);
 };
 
 domino.discard = function(funDiscard) {
@@ -470,72 +473,102 @@ domino.widgetClear = function() {
   }
 };
 
-// entrypoint
-domino.start = function(){
-	var director = new lime.Director(document.body,1024,768),
-	    scene = new lime.Scene(),
-	    
-	    // shows current game pieces
-      gameBoard = new domino.board(null, null, 5, 5),
-	    blockLayer = new lime.Layer().setPosition(200,50),
-	    
-	    
-	    
-	    nextBlockLayer = new lime.Layer().setPosition(0,0),
-	    blockFactory = new domino.blockFactory(),
-	    _nextBlock = null,
-	    boardDisplay = new domino.boardDisplay(blockLayer, gameBoard),
-	    initBlock = new domino.block(1, 1, domino.wild.symbol, domino.wild.color),
-	    
-	    // widget clear
-	    clearWidget = new domino.widgetClear(),
-	    
-	    // discard
-	    discard = new domino.discard();
+domino.round = function(game, options) {
+  var gameBoard = new domino.board(null, null, 
+      options.boardSize || 3, 
+      options.boardSize || 3),
+    blockLayer = new lime.Layer().setPosition(200,50),
+  
+    _nextBlock = null,
+    boardDisplay = new domino.boardDisplay(blockLayer, gameBoard),
+    initBlock = new domino.block(1, 1, domino.wild.symbol, domino.wild.color);
 
-  scene.appendChild(blockLayer);
-  scene.appendChild(nextBlockLayer);
+  game.scene.appendChild(blockLayer);
+    
+  
+  // init block
+  
+  var mid = Math.floor(gameBoard.rows/2);
+  boardDisplay.swapBlock(initBlock, mid, mid);
+  
+  boardDisplay.each(function(blockDisplay) {
+    goog.events.listen(blockDisplay.sprite, 'click', function(e) {
+      // the clicked block
+      var blk = blockDisplay.block,
+        _nextBlock = game.getNextBlock();
+      
+      if(gameBoard.isValid(blk, _nextBlock.block)) {
+        boardDisplay.swapBlock(_nextBlock.block, blk.col, blk.row);
+        boardDisplay.update();
+        options.onValidMove(boardDisplay);
+      }
+    });
+  });
+  
+  this.remove = function() {
+    game.scene.removeChild(blockLayer);
+  }
+}
+
+domino.game = function() {
+  var that = this,
+    scene = this.scene = new lime.Scene(),
+    blockFactory = new domino.blockFactory(),
+    roundOptions = {
+      onValidMove: function(boardDisplay) {
+        nextBlock();
+        var count = boardDisplay.board.clearedCountCached;
+        clearWidget.text(count);
+        if(boardDisplay.board.cleared()) {
+          round.remove();
+          roundOptions.boardSize += 2;
+          // increment the color and symbol options
+          blockFactory.inc();  
+          round = new domino.round(that, roundOptions);
+        }
+      },
+      boardSize: 3
+    },
+    round = new domino.round(this, roundOptions),
+  
+    nextBlockLayer = new lime.Layer().setPosition(0,0),
+  
+    // widget clear
+    clearWidget = new domino.widgetClear(),
+  
+    // discard
+    discard = new domino.discard();
+
+  scene.appendChild(nextBlockLayer);  
   scene.appendChild(discard.layer);
   scene.appendChild(clearWidget.layer);
 
-  
+
   function nextBlock() {
     _nextBlock.swapBlock(blockFactory.generate());
   }
   //create next block
   _nextBlock = new domino.blockDisplay(blockFactory.generate());
   nextBlockLayer.appendChild(_nextBlock.sprite);
+
+  this.getNextBlock = function() {
+    return _nextBlock;
+  }
   
-  var mid = Math.floor(gameBoard.rows/2);
-  boardDisplay.swapBlock(initBlock, mid, mid);
+  discard.ondiscard = function(e) {
+    nextBlock();
+  }
+}
 
-	director.makeMobileWebAppCapable();
-
-    boardDisplay.each(function(blockDisplay) {
-      goog.events.listen(blockDisplay.sprite, 'click', function(e) {
-        // the clicked block
-        var blk = blockDisplay.block;
-        
-        if(gameBoard.isValid(blk, _nextBlock.block)) {
-          boardDisplay.swapBlock(_nextBlock.block, blk.col, blk.row);
-          nextBlock();
-          boardDisplay.update();
-          if(boardDisplay.board.cleared()) {
-            alert('You won!');
-          }
-          var count = boardDisplay.board.clearedCountCached;
-          clearWidget.text(count);
-        }
-      });
-    });
-	  
-	  discard.ondiscard = function(e) {
-	    nextBlock();
-	  };
-    
-
+// entrypoint
+domino.start = function(){
+	var director = new lime.Director(document.body,1024,768),
+	  game = new domino.game();
+	    
+  director.makeMobileWebAppCapable();
+  
 	// set current scene active
-	director.replaceScene(scene);
+	director.replaceScene(game.scene);
 
 }
 
