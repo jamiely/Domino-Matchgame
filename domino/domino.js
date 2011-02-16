@@ -258,7 +258,8 @@ domino.board = function(symbol, color, cols, rows) {
           domino.wild.color == replacement.color;
         
         var symMatch = blk.symbol == replacement.symbol ||
-          blk.symbol == domino.wild.symbol;
+          blk.symbol == domino.wild.symbol ||
+          domino.wild.symbol == replacement.symbol;
           
         return !(colMatch || symMatch);
       }),
@@ -399,8 +400,17 @@ domino.boardDisplay = function(layer, board) {
 };
 
 domino.blockFactory = function() {
-  this.symbols = [1,2,3,domino.wild.symbol];
-  this.colors = ['#F00', '#0f0', '#FF0', '#00f', '#0ff'];
+  var possibleColors = [
+    '#F00', '#0f0', '#FF0', '#00f', '#0ff',
+    '#8414AC', '#2FDEFB', '#F11B71', '#54FF45', '#2008FF'
+    ],
+    possibleSymbols = [
+      1, domino.wild.symbol, 2, 3, 4,
+      5, 6, 7, 8, 9
+    ];
+  
+  this.symbols = [];
+  this.colors = [];
   
   var randIndex = function(a) {
       return Math.floor(Math.random() * a.length);
@@ -415,6 +425,15 @@ domino.blockFactory = function() {
     }
     return new domino.block(1, 1, sym, color);
   };
+  
+  this.inc = function() {
+    this.colors.push(possibleColors.shift());
+    this.symbols.push(possibleSymbols.shift());
+  }
+  
+  // add 4 symbols
+  this.inc();
+  this.inc();
 };
 
 domino.discard = function(funDiscard) {
@@ -457,7 +476,7 @@ domino.start = function(){
 	    scene = new lime.Scene(),
 	    
 	    // shows current game pieces
-      gameBoard = new domino.board(null, null, 11, 11),
+      gameBoard = new domino.board(null, null, 5, 5),
 	    blockLayer = new lime.Layer().setPosition(200,50),
 	    
 	    
