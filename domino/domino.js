@@ -254,7 +254,8 @@ domino.board = function(symbol, color, cols, rows) {
         if(empty) return false;
         
         var colMatch = blk.color == replacement.color || 
-          blk.color == domino.wild.color;
+          blk.color == domino.wild.color ||
+          domino.wild.color == replacement.color;
         
         var symMatch = blk.symbol == replacement.symbol ||
           blk.symbol == domino.wild.symbol;
@@ -398,7 +399,7 @@ domino.boardDisplay = function(layer, board) {
 };
 
 domino.blockFactory = function() {
-  this.symbols = [1,2,3,4,5];
+  this.symbols = [1,2,3,domino.wild.symbol];
   this.colors = ['#F00', '#0f0', '#FF0', '#00f', '#0ff'];
   
   var randIndex = function(a) {
@@ -409,7 +410,9 @@ domino.blockFactory = function() {
   this.generate = function() {
     var sym = rand(this.symbols),
       color = rand(this.colors);
-      
+    if(sym == domino.wild.symbol) {
+      color = domino.wild.color;
+    }
     return new domino.block(1, 1, sym, color);
   };
 };
