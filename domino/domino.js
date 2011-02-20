@@ -7,9 +7,10 @@ goog.require('lime.Director');
 goog.require('lime.Scene');
 goog.require('lime.Layer');
 goog.require('lime.Label');
+goog.require('lime.RoundedRect');
 
-domino.blockWidth = 30;
-domino.blockHeight = 30;
+domino.blockWidth = 20;
+domino.blockHeight = 20;
 
 domino.colors = {
   empty: '#EEE',
@@ -83,6 +84,10 @@ domino.block = function(col, row, symbol, color) {
   var clear = this.clear = function() {
     return symbol == domino.symbols.cleared; 
   }
+  
+  var wild = this.wild = function() {
+    return symbol == domino.symbols.wild;
+  };
 
 }
 
@@ -281,16 +286,43 @@ domino.board.getClearBlock = function(c,r) {
 domino.blockDisplay = function(block, w, h) {
   this.width = w = w || domino.blockWidth;
   this.height = h = h || domino.blockHeight;
-  this.sprite = new lime.Label().setSize(w,h)
-    .setPosition(w * block.col, h * block.row);
+  
+  // creates the appearance of a rounded rectangle with a stroke
+  var sprite = this.sprite = new lime.Sprite()
+      .setSize(w,h)
+      .setPosition(w * block.col, h * block.row),
+    outerRoundRect = new lime.RoundedRect()
+      .setSize(w,h),
+    innerRoundRect = new lime.RoundedRect()
+      .setSize(w-4, h-4),
+    label = new lime.Label()
+      .setFontFamily('bauhaus 93')
+      .setSize(w-5, h-7)
+      .setText('?');
+      
+  
+  sprite.appendChild(outerRoundRect);
+  outerRoundRect.appendChild(innerRoundRect);
+  innerRoundRect.appendChild(label);
+  
   this.cleared = false;
   
   this.swapBlock = function(block) {
     this.block = block;
     
-    this.sprite
-      .setFill(block.color)
-      .setText(block.symbol);
+    if(block.empty() || block.clear()) {
+      sprite.setFill(block.color);
+      outerRoundRect.setFill(block.color);
+      innerRoundRect.setFill(block.color);
+      
+      label.setText('');
+    }
+    else {
+      var color = new lime.fill.Color(block.color);
+      outerRoundRect.setFill(color.addBrightness(-0.2));
+      innerRoundRect.setFill(block.color);
+      label.setText(block.wild()? '☆' : block.symbol);
+    }
   };
   this.swapBlock(block, w, h);
 }
@@ -304,8 +336,6 @@ domino.boardDisplay = function(layer, board) {
     if(!display[block.col]) {
       display[block.col] = [];
     }
-    
-
     
     var spriteBlock = 
       display[block.col][block.row] = 
@@ -442,10 +472,11 @@ domino.blockFactory = function() {
 domino.discard = function(funDiscard) {
   var
     that = this,
-    layer = this.layer = new lime.Layer().setPosition(0, 100);
+    layer = this.layer = new lime.Layer().setPosition(50, 240);
   
   var text = new lime.Label()
-    .setSize(100, 25).setPosition(50, 0)
+    .setFontFamily('bauhaus 93')
+    .setSize(100, 25)
     .setText('Discard').setFill('#CCF');
     
   layer.appendChild(text);
@@ -456,8 +487,10 @@ domino.discard = function(funDiscard) {
 };
 
 domino.widgetClear = function() {
-  var layer = this.layer = new lime.Layer().setPosition(0, 150),
-    text = new lime.Label().setSize(100, 25).setPosition(50, 0)
+  var layer = this.layer = new lime.Layer().setPosition(200, 240),
+    text = new lime.Label()
+      .setFontFamily('bauhaus 93')
+      .setSize(100, 25)
       .setText('0 cleared').setFill('#EEE');
   
   layer.appendChild(text);
@@ -477,7 +510,8 @@ domino.round = function(game, options) {
   var gameBoard = new domino.board(null, null, 
       options.boardSize || 3, 
       options.boardSize || 3),
-    blockLayer = new lime.Layer().setPosition(200,50),
+    blockLayer = new lime.Layer()
+      .setPosition(20, 15),
   
     _nextBlock = null,
     boardDisplay = new domino.boardDisplay(blockLayer, gameBoard),
@@ -521,17 +555,21 @@ domino.game = function() {
         clearWidget.text(count);
         if(boardDisplay.board.cleared()) {
           round.remove();
+
           roundOptions.boardSize += 2;
+          if(roundOptions.boardSize > 11) {
+            roundOptions.boardSize = 11;
+          }
           // increment the color and symbol options
           blockFactory.inc();  
           round = new domino.round(that, roundOptions);
         }
       },
-      boardSize: 3
+      boardSize: 11
     },
     round = new domino.round(this, roundOptions),
   
-    nextBlockLayer = new lime.Layer().setPosition(0,0),
+    nextBlockLayer = new lime.Layer().setPosition(105, 220),
   
     // widget clear
     clearWidget = new domino.widgetClear(),
@@ -542,7 +580,6 @@ domino.game = function() {
   scene.appendChild(nextBlockLayer);  
   scene.appendChild(discard.layer);
   scene.appendChild(clearWidget.layer);
-
 
   function nextBlock() {
     _nextBlock.swapBlock(blockFactory.generate());
@@ -562,10 +599,10 @@ domino.game = function() {
 
 // entrypoint
 domino.start = function(){
-	var director = new lime.Director(document.body,1024,768),
+	var director = new lime.Director(document.body,240,320),
 	  game = new domino.game();
 	    
-  director.makeMobileWebAppCapable();
+  //director.makeMobileWebAppCapable();
   
 	// set current scene active
 	director.replaceScene(game.scene);
