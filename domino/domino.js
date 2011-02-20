@@ -302,8 +302,8 @@ domino.blockDisplay = function(block, w, h) {
       
   
   sprite.appendChild(outerRoundRect);
-  outerRoundRect.appendChild(innerRoundRect);
-  innerRoundRect.appendChild(label);
+  sprite.appendChild(innerRoundRect);
+  sprite.appendChild(label);
   
   this.cleared = false;
   
