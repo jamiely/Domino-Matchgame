@@ -12,6 +12,10 @@ goog.require('lime.RoundedRect');
 domino.blockWidth = 20;
 domino.blockHeight = 20;
 
+domino.message = function(str) {
+  alert(str);
+};
+
 domino.colors = {
   empty: '#EEE',
   cleared: '#d1c072'
@@ -456,10 +460,14 @@ domino.blockFactory = function() {
     }
     return new domino.block(1, 1, sym, color);
   };
+
+  var addSymbol = function() {
+    that.symbols.push(possibleSymbols.shift());
+  }
   
   var inc = this.inc = function(counter) {
     that.colors.push(possibleColors.shift());
-    that.symbols.push(possibleSymbols.shift());
+    addSymbol();
     if(counter && counter > 0) {
       that.inc(counter-1);
     }
@@ -467,18 +475,33 @@ domino.blockFactory = function() {
   
   // add 4 symbols
   this.inc(1);
+  addSymbol(); // add an extra symbol in the beginning to make things interesting
 };
 
-domino.discard = function(funDiscard) {
+domino.title = function() {
+  var that = this,
+    layer = this.layer = new lime.Layer().setPosition(80, 16);
+
+  var text = new lime.Label()
+    .setFontFamily('bauhaus 93')
+    .setSize(350, 25)
+    .setText('Domino Match Game').setFill('#F00');
+
+  layer.appendChild(text);
+
+  this.setText = function(str) { text.setText(str); }
+};
+
+domino.discard = function() {
   var
     that = this,
-    layer = this.layer = new lime.Layer().setPosition(50, 240);
-  
+    layer = this.layer = new lime.Layer().setPosition(50, 270);
+
   var text = new lime.Label()
     .setFontFamily('bauhaus 93')
     .setSize(100, 25)
     .setText('Discard').setFill('#CCF');
-    
+
   layer.appendChild(text);
   this.ondiscard = function(e) { console.log(e); }
   goog.events.listen(text, 'click', function(e){
@@ -487,7 +510,7 @@ domino.discard = function(funDiscard) {
 };
 
 domino.widgetClear = function() {
-  var layer = this.layer = new lime.Layer().setPosition(200, 240),
+  var layer = this.layer = new lime.Layer().setPosition(200, 270),
     text = new lime.Label()
       .setFontFamily('bauhaus 93')
       .setSize(100, 25)
@@ -511,7 +534,7 @@ domino.round = function(game, options) {
       options.boardSize || 3, 
       options.boardSize || 3),
     blockLayer = new lime.Layer()
-      .setPosition(20, 15),
+      .setPosition(20, 45),
   
     _nextBlock = null,
     boardDisplay = new domino.boardDisplay(blockLayer, gameBoard),
@@ -535,6 +558,10 @@ domino.round = function(game, options) {
         boardDisplay.swapBlock(_nextBlock.block, blk.col, blk.row);
         boardDisplay.update();
         options.onValidMove(boardDisplay);
+        domino.message('Domino Match Game');
+      }
+      else {
+        domino.message('That block cannot be placed there.');
       }
     });
   });
@@ -569,17 +596,23 @@ domino.game = function() {
     },
     round = new domino.round(this, roundOptions),
   
-    nextBlockLayer = new lime.Layer().setPosition(105, 220),
+    nextBlockLayer = new lime.Layer().setPosition(105, 250),
   
     // widget clear
     clearWidget = new domino.widgetClear(),
   
+    title = new domino.title(),
     // discard
     discard = new domino.discard();
+
+  domino.message = function(str) {
+    title.setText(str);
+  };
 
   scene.appendChild(nextBlockLayer);  
   scene.appendChild(discard.layer);
   scene.appendChild(clearWidget.layer);
+  scene.appendChild(title.layer);
 
   function nextBlock() {
     _nextBlock.swapBlock(blockFactory.generate());
